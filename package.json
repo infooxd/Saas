@@ -1,0 +1,22 @@
+{
+  "name": "oxdel-saas-builder",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Oxdel - Multi-category SaaS Builder Platform",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run frontend:dev\" \"npm run backend:dev\"",
+    "frontend:dev": "cd frontend && npm run dev",
+    "backend:dev": "cd backend && npm run dev",
+    "install:all": "npm install && cd frontend && npm install && cd ../backend && npm install"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": ["saas", "website-builder", "landing-page", "oxdel"],
+  "author": "Oxdel Team",
+  "license": "MIT"
+}
