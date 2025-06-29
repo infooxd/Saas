@@ -14,7 +14,6 @@ import PreviewPage from './pages/PreviewPage.jsx';
 import PublicProjectPage from './pages/PublicProjectPage.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
 import PricingPage from './pages/PricingPage.jsx';
-import AffiliatePage from './pages/AffiliatePage.jsx';
 import MarketplacePage from './pages/MarketplacePage.jsx';
 
 // Protected Route Component
@@ -109,11 +108,6 @@ function AppRoutes() {
       <Route path="/analytics/:projectId" element={
         <ProtectedRoute>
           <AnalyticsPage />
-        </ProtectedRoute>
-      } />
-      <Route path="/affiliate" element={
-        <ProtectedRoute>
-          <AffiliatePage />
         </ProtectedRoute>
       } />
       
