@@ -14,7 +14,6 @@ import PreviewPage from './pages/PreviewPage.jsx';
 import PublicProjectPage from './pages/PublicProjectPage.jsx';
 import AnalyticsPage from './pages/AnalyticsPage.jsx';
 import PricingPage from './pages/PricingPage.jsx';
-import MarketplacePage from './pages/MarketplacePage.jsx';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -79,7 +78,6 @@ function AppRoutes() {
       {/* Public Pages */}
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/templates" element={<TemplatesPage />} />
-      <Route path="/marketplace" element={<MarketplacePage />} />
       
       {/* Public Project Pages */}
       <Route path="/p/:slug" element={<PublicProjectPage />} />
