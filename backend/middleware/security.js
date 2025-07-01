@@ -52,12 +52,13 @@ export const paymentRateLimit = createRateLimit(
   'Too many payment attempts, please try again later'
 );
 
-// Slow down middleware for brute force protection
+// Slow down middleware for brute force protection - FIXED
 export const speedLimiter = slowDown({
   windowMs: 15 * 60 * 1000, // 15 minutes
   delayAfter: 2, // Allow 2 requests per windowMs without delay
-  delayMs: 500, // Add 500ms delay per request after delayAfter
+  delayMs: () => 500, // Fixed: Use function that returns delay
   maxDelayMs: 20000, // Maximum delay of 20 seconds
+  validate: { delayMs: false } // Disable warning
 });
 
 // Input sanitization middleware

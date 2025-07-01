@@ -5,30 +5,42 @@ import dotenv from 'dotenv';
 // Load environment variables
 dotenv.config();
 
-// Validate required environment variables
-if (!process.env.DATABASE_URL) {
-  console.error('❌ DATABASE_URL environment variable is required');
-  console.error('📝 Please check your .env file and ensure DATABASE_URL is set');
-  process.exit(1);
-}
+// For development, we'll use a simple fallback if no DATABASE_URL is provided
+const getDatabaseConfig = () => {
+  if (process.env.DATABASE_URL) {
+    return {
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    };
+  }
+  
+  // Fallback for local development
+  return {
+    host: 'localhost',
+    port: 5432,
+    database: 'oxdel_db',
+    user: 'postgres',
+    password: 'password',
+    ssl: false
+  };
+};
 
 // Create PostgreSQL connection pool
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+  ...getDatabaseConfig(),
   max: 20,
   idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000, // Increased timeout
+  connectionTimeoutMillis: 10000,
 });
 
 // Test connection
 pool.on('connect', () => {
-  console.log('✅ Connected to Supabase PostgreSQL database');
+  console.log('✅ Connected to PostgreSQL database');
 });
 
 pool.on('error', (err) => {
-  console.error('❌ Supabase PostgreSQL connection error:', err);
-  console.error('📝 Please check your DATABASE_URL in .env file');
+  console.error('❌ PostgreSQL connection error:', err.message);
+  console.error('📝 Please check your database configuration');
 });
 
 // Helper function to execute queries
@@ -40,7 +52,7 @@ export const query = async (text, params) => {
     console.log('Executed query', { text: text.substring(0, 50) + '...', duration, rows: res.rowCount });
     return res;
   } catch (error) {
-    console.error('Database query error:', error);
+    console.error('Database query error:', error.message);
     console.error('Query:', text);
     console.error('Params:', params);
     throw error;
@@ -62,7 +74,14 @@ const testConnection = async () => {
     return true;
   } catch (error) {
     console.error('❌ Database connection test failed:', error.message);
-    console.error('📝 Please verify your Supabase credentials in .env file');
+    console.error('📝 Please verify your database is running and credentials are correct');
+    
+    // For development, we'll continue without database
+    if (process.env.NODE_ENV === 'development') {
+      console.log('⚠️ Continuing in development mode without database');
+      return false;
+    }
+    
     return false;
   }
 };

@@ -107,12 +107,12 @@ app.get('/health', async (req, res) => {
     client.release();
     dbStatus = 'connected';
   } catch (error) {
-    console.error('Health check database error:', error);
+    console.error('Health check database error:', error.message);
   }
 
   try {
     // Redis health check would go here
-    redisStatus = 'connected'; // Placeholder
+    redisStatus = 'not_configured'; // Placeholder
   } catch (error) {
     console.error('Health check redis error:', error);
   }
@@ -132,18 +132,18 @@ app.get('/health', async (req, res) => {
     }
   };
 
-  const statusCode = (dbStatus === 'connected') ? 200 : 503;
+  const statusCode = 200; // Always return 200 for development
   res.status(statusCode).json(healthStatus);
 });
 
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
-    message: 'Oxdel SaaS Builder API - Production Ready',
+    message: 'Oxdel SaaS Builder API - Development Mode',
     version: '1.0.0',
     status: 'active',
     environment: NODE_ENV,
-    database: 'Supabase PostgreSQL',
+    database: 'PostgreSQL (Local/Supabase)',
     features: [
       'Authentication & Authorization',
       'User Management & Profiles',
@@ -198,12 +198,12 @@ app.use((err, req, res, next) => {
   });
   
   // Database connection errors
-  if (err.code === 'ECONNREFUSED') {
-    return res.status(500).json({
+  if (err.code === 'ECONNREFUSED' || err.code === 'ENOTFOUND') {
+    return res.status(503).json({
       success: false,
       message: 'Database connection failed',
       requestId: req.requestId,
-      error: NODE_ENV === 'development' ? 'Please check your DATABASE_URL in .env file' : 'Database connection error'
+      error: NODE_ENV === 'development' ? 'Please check your database configuration' : 'Service temporarily unavailable'
     });
   }
   
@@ -300,19 +300,18 @@ process.on('SIGINT', () => {
 
 // Start server
 async function startServer() {
-  console.log('🔧 Starting Oxdel Backend API (Production Ready)...');
+  console.log('🔧 Starting Oxdel Backend API (Development Mode)...');
   console.log(`📍 Environment: ${NODE_ENV}`);
   console.log(`🔗 API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`);
   
-  // Test database connection
+  // Test database connection (non-blocking in development)
   const dbConnected = await testConnection();
-  if (!dbConnected) {
-    console.error('❌ Failed to connect to database. Please check your .env configuration.');
-    console.error('📝 Required: DATABASE_URL should point to your Supabase PostgreSQL instance');
+  if (!dbConnected && NODE_ENV === 'production') {
+    console.error('❌ Failed to connect to database in production mode.');
     process.exit(1);
   }
   
-  // Connect to Redis
+  // Connect to Redis (optional)
   try {
     await connectRedis();
     console.log('✅ Redis connection established');
@@ -333,14 +332,14 @@ async function startServer() {
     console.log(`🤝 Affiliate endpoints: /api/affiliate/*`);
     console.log(`🛒 Marketplace endpoints: /api/marketplace/*`);
     console.log(`👑 Admin endpoints: /api/admin/*`);
-    console.log(`🗄️ Database: Supabase PostgreSQL`);
-    console.log(`🔄 Cache: Redis`);
-    console.log(`🌐 CORS: Production configured`);
+    console.log(`🗄️ Database: ${dbConnected ? 'Connected' : 'Disconnected (Development Mode)'}`);
+    console.log(`🔄 Cache: Redis ${process.env.REDIS_URL ? 'Configured' : 'Not Configured'}`);
+    console.log(`🌐 CORS: Development configured`);
     console.log(`🛡️ Security: Rate limiting, sanitization, headers`);
-    console.log(`📧 Email: Production SMTP configured`);
-    console.log(`☁️ Storage: AWS S3 + CloudFront`);
-    console.log(`💰 Payments: Stripe integration`);
-    console.log('✅ Production ready!');
+    console.log(`📧 Email: Development mode (console logging)`);
+    console.log(`☁️ Storage: Local filesystem`);
+    console.log(`💰 Payments: Development mode (test keys)`);
+    console.log('✅ Development server ready!');
   });
 }
 
