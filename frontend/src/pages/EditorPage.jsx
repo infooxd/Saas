@@ -3,8 +3,7 @@ import { motion } from 'framer-motion';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Share, Settings, Globe } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import EditorSidebar from '../components/ui/EditorSidebar';
-import EditorCanvas from '../components/ui/EditorCanvas';
+import ElementorEditor from '../components/ui/ElementorEditor';
 import PublishButton from '../components/ui/PublishButton';
 import PreviewButton from '../components/ui/PreviewButton';
 import Button from '../components/ui/Button';
@@ -18,8 +17,6 @@ const EditorPage = () => {
   
   const [project, setProject] = useState(null);
   const [blocks, setBlocks] = useState([]);
-  const [selectedBlockId, setSelectedBlockId] = useState(null);
-  const [activeTab, setActiveTab] = useState('blocks');
   const [saving, setSaving] = useState(false);
   const [publishing, setPublishing] = useState(false);
   const [alert, setAlert] = useState(null);
@@ -145,24 +142,6 @@ const EditorPage = () => {
     }
   };
 
-  const handleAddBlock = (newBlock) => {
-    setBlocks(prev => [...prev, newBlock]);
-    setSelectedBlockId(newBlock.id);
-    setActiveTab('design');
-    setAlert({ type: 'success', message: `${newBlock.name} added to page` });
-  };
-
-  const handleSelectBlock = (block) => {
-    setSelectedBlockId(block.id);
-    setActiveTab('design');
-  };
-
-  const handleUpdateBlock = (blockId, updatedBlock) => {
-    setBlocks(prev => prev.map(block => 
-      block.id === blockId ? updatedBlock : block
-    ));
-  };
-
   const handlePreview = (device = 'desktop') => {
     const previewUrl = `/preview/${projectId}`;
     const deviceWidths = {
@@ -174,8 +153,6 @@ const EditorPage = () => {
     const windowFeatures = `width=${width + 100},height=800,scrollbars=yes,resizable=yes`;
     window.open(previewUrl, '_blank', windowFeatures);
   };
-
-  const selectedBlock = blocks.find(block => block.id === selectedBlockId);
 
   if (loading || projectLoading) {
     return (
@@ -212,7 +189,7 @@ const EditorPage = () => {
                 {project?.title || 'Untitled Project'}
               </h1>
               <p className="text-sm text-gray-500">
-                Last saved: {project?.updated_at ? new Date(project.updated_at).toLocaleString() : 'Never'}
+                Elementor-style Editor • Last saved: {project?.updated_at ? new Date(project.updated_at).toLocaleString() : 'Never'}
               </p>
             </div>
           </div>
@@ -233,15 +210,6 @@ const EditorPage = () => {
             <Button variant="ghost" icon={Settings} size="sm">
               Settings
             </Button>
-            
-            <Button 
-              variant="primary" 
-              onClick={saveProject}
-              loading={saving}
-              size="sm"
-            >
-              Save
-            </Button>
           </div>
         </div>
       </div>
@@ -261,25 +229,14 @@ const EditorPage = () => {
         </motion.div>
       )}
 
-      {/* Editor Layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar */}
-        <EditorSidebar
-          activeTab={activeTab}
-          onTabChange={setActiveTab}
-          onAddBlock={handleAddBlock}
-          selectedBlock={selectedBlock}
-          onUpdateBlock={handleUpdateBlock}
-        />
-
-        {/* Main Canvas */}
-        <EditorCanvas
+      {/* Elementor Editor */}
+      <div className="flex-1 overflow-hidden">
+        <ElementorEditor
           blocks={blocks}
-          selectedBlockId={selectedBlockId}
-          onSelectBlock={handleSelectBlock}
           onUpdateBlocks={setBlocks}
           onSave={saveProject}
           saving={saving}
+          projectId={projectId}
         />
       </div>
     </div>

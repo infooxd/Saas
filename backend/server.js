@@ -31,6 +31,7 @@ import paymentsRoutes from './routes/payments.js';
 import affiliateRoutes from './routes/affiliate.js';
 import marketplaceRoutes from './routes/marketplace.js';
 import adminRoutes from './routes/admin.js';
+import uploadRoutes from './routes/upload.js';
 
 // Load environment variables
 dotenv.config();
@@ -139,22 +140,23 @@ app.get('/health', async (req, res) => {
 // Root endpoint
 app.get('/', (req, res) => {
   res.json({
-    message: 'Oxdel SaaS Builder API - Development Mode',
+    message: 'Oxdel SaaS Builder API - Elementor Style Editor',
     version: '1.0.0',
     status: 'active',
     environment: NODE_ENV,
-    database: 'PostgreSQL (Local/Supabase)',
+    database: 'PostgreSQL (Supabase)',
     features: [
+      'Elementor-Style Visual Editor',
+      'Pre-built Template Blocks',
+      'Image Upload System',
+      'Floating Contact Buttons',
+      'WhatsApp & Telegram Integration',
       'Authentication & Authorization',
       'User Management & Profiles',
       'Template System & Marketplace',
-      'Visual Editor & Analytics',
       'Payment Processing',
       'Affiliate System',
-      'Admin Dashboard',
-      'File Upload & Storage',
-      'Email Notifications',
-      'Rate Limiting & Security'
+      'Admin Dashboard'
     ],
     timestamp: new Date().toISOString(),
     endpoints: {
@@ -167,7 +169,8 @@ app.get('/', (req, res) => {
       payments: '/api/payments/*',
       affiliate: '/api/affiliate/*',
       marketplace: '/api/marketplace/*',
-      admin: '/api/admin/*'
+      admin: '/api/admin/*',
+      upload: '/api/upload/*'
     },
     documentation: `${process.env.API_URL}/docs`,
     support: 'support@oxdel.com'
@@ -184,6 +187,7 @@ app.use('/api/payments', paymentsRoutes);
 app.use('/api/affiliate', affiliateRoutes);
 app.use('/api/marketplace', marketplaceRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // Global error handling middleware
 app.use((err, req, res, next) => {
@@ -211,7 +215,7 @@ app.use((err, req, res, next) => {
   if (err.code === 'LIMIT_FILE_SIZE') {
     return res.status(400).json({
       success: false,
-      message: 'File terlalu besar. Maksimal 10MB',
+      message: 'File terlalu besar. Maksimal 5MB',
       requestId: req.requestId
     });
   }
@@ -278,10 +282,8 @@ app.use('*', (req, res) => {
       'POST /api/auth/register',
       'GET /api/templates',
       'GET /api/projects',
-      'GET /api/analytics/overview',
-      'POST /api/payments/create-intent',
-      'GET /api/affiliate/stats',
-      'GET /api/marketplace/templates'
+      'POST /api/upload/:type',
+      'GET /api/analytics/overview'
     ],
     documentation: `${process.env.API_URL}/docs`
   });
@@ -300,7 +302,7 @@ process.on('SIGINT', () => {
 
 // Start server
 async function startServer() {
-  console.log('🔧 Starting Oxdel Backend API (Development Mode)...');
+  console.log('🔧 Starting Oxdel Backend API (Elementor Style Editor)...');
   console.log(`📍 Environment: ${NODE_ENV}`);
   console.log(`🔗 API URL: ${process.env.API_URL || `http://localhost:${PORT}`}`);
   
@@ -323,23 +325,17 @@ async function startServer() {
     console.log(`🚀 Oxdel Backend API running on port ${PORT}`);
     console.log(`🔗 Health check: http://localhost:${PORT}/health`);
     console.log(`🔗 API Documentation: ${process.env.API_URL || `http://localhost:${PORT}`}`);
-    console.log(`🔐 Auth endpoints: /api/auth/*`);
-    console.log(`👤 User endpoints: /api/user/*`);
-    console.log(`🎨 Template endpoints: /api/templates/*`);
-    console.log(`📁 Project endpoints: /api/projects/*`);
-    console.log(`📊 Analytics endpoints: /api/analytics/*`);
-    console.log(`💳 Payment endpoints: /api/payments/*`);
-    console.log(`🤝 Affiliate endpoints: /api/affiliate/*`);
-    console.log(`🛒 Marketplace endpoints: /api/marketplace/*`);
-    console.log(`👑 Admin endpoints: /api/admin/*`);
+    console.log(`🎨 Elementor Editor: Visual drag-and-drop editing`);
+    console.log(`📱 Floating Contacts: WhatsApp & Telegram integration`);
+    console.log(`📁 Image Upload: /api/upload/* endpoints`);
     console.log(`🗄️ Database: ${dbConnected ? 'Connected' : 'Disconnected (Development Mode)'}`);
     console.log(`🔄 Cache: Redis ${process.env.REDIS_URL ? 'Configured' : 'Not Configured'}`);
     console.log(`🌐 CORS: Development configured`);
     console.log(`🛡️ Security: Rate limiting, sanitization, headers`);
     console.log(`📧 Email: Development mode (console logging)`);
-    console.log(`☁️ Storage: Local filesystem`);
+    console.log(`☁️ Storage: Local filesystem uploads`);
     console.log(`💰 Payments: Development mode (test keys)`);
-    console.log('✅ Development server ready!');
+    console.log('✅ Elementor-style editor ready!');
   });
 }
 
