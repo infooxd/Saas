@@ -2,29 +2,23 @@ import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
 import { body, validationResult } from 'express-validator';
 import { query } from '../config/database.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { sendEmail } from '../config/email.js';
 
 const router = express.Router();
-
-// Email transporter setup
-const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: process.env.EMAIL_SECURE === 'true',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-});
 
 // Generate JWT token
 const generateToken = (userId) => {
   return jwt.sign({ userId }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   });
+};
+
+// Generate verification token
+const generateVerificationToken = () => {
+  return crypto.randomBytes(32).toString('hex');
 };
 
 // POST /api/auth/register
@@ -73,28 +67,202 @@ router.post('/register', [
     const saltRounds = 12;
     const passwordHash = await bcrypt.hash(password, saltRounds);
 
+    // Generate verification token
+    const verificationToken = generateVerificationToken();
+    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
     // Insert new user
     const result = await query(
-      'INSERT INTO users (full_name, email, password_hash) VALUES ($1, $2, $3) RETURNING id, full_name, email, role, plan, trial_expiry, created_at',
-      [fullName, email, passwordHash]
+      `INSERT INTO users (full_name, email, password_hash, email_verification_token, email_verification_expiry) 
+       VALUES ($1, $2, $3, $4, $5) 
+       RETURNING id, full_name, email, role, plan, trial_expiry, created_at`,
+      [fullName, email, passwordHash, verificationToken, verificationExpiry]
     );
 
     const newUser = result.rows[0];
 
-    // Generate token
+    // Generate JWT token
     const token = generateToken(newUser.id);
+
+    // Send verification email
+    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+    
+    try {
+      await sendEmail(email, 'welcome', {
+        user: newUser,
+        verificationUrl
+      });
+      console.log('✅ Verification email sent to:', email);
+    } catch (emailError) {
+      console.error('❌ Failed to send verification email:', emailError);
+      // Don't fail registration if email fails
+    }
 
     res.status(201).json({
       success: true,
-      message: 'Akun berhasil dibuat',
+      message: 'Akun berhasil dibuat! Silakan cek email untuk verifikasi.',
       data: {
         user: newUser,
-        token
+        token,
+        emailSent: true
       }
     });
 
   } catch (error) {
     console.error('Register error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server'
+    });
+  }
+});
+
+// POST /api/auth/verify-email
+router.post('/verify-email', [
+  body('token')
+    .notEmpty()
+    .withMessage('Token verifikasi wajib diisi'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token tidak valid',
+        errors: errors.array()
+      });
+    }
+
+    const { token } = req.body;
+
+    // Find user by verification token
+    const result = await query(
+      `SELECT id, full_name, email, email_verified 
+       FROM users 
+       WHERE email_verification_token = $1 
+       AND email_verification_expiry > NOW()`,
+      [token]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Token verifikasi tidak valid atau sudah kedaluwarsa'
+      });
+    }
+
+    const user = result.rows[0];
+
+    if (user.email_verified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email sudah terverifikasi sebelumnya'
+      });
+    }
+
+    // Update user as verified
+    await query(
+      `UPDATE users 
+       SET email_verified = true, 
+           email_verification_token = NULL, 
+           email_verification_expiry = NULL,
+           updated_at = NOW()
+       WHERE id = $1`,
+      [user.id]
+    );
+
+    res.json({
+      success: true,
+      message: 'Email berhasil diverifikasi! Selamat datang di Oxdel.'
+    });
+
+  } catch (error) {
+    console.error('Email verification error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Terjadi kesalahan server'
+    });
+  }
+});
+
+// POST /api/auth/resend-verification
+router.post('/resend-verification', [
+  body('email')
+    .isEmail()
+    .normalizeEmail()
+    .withMessage('Email tidak valid'),
+], async (req, res) => {
+  try {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email tidak valid',
+        errors: errors.array()
+      });
+    }
+
+    const { email } = req.body;
+
+    // Find user
+    const result = await query(
+      'SELECT id, full_name, email, email_verified FROM users WHERE email = $1',
+      [email]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Email tidak ditemukan'
+      });
+    }
+
+    const user = result.rows[0];
+
+    if (user.email_verified) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email sudah terverifikasi'
+      });
+    }
+
+    // Generate new verification token
+    const verificationToken = generateVerificationToken();
+    const verificationExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // Update user with new token
+    await query(
+      `UPDATE users 
+       SET email_verification_token = $1, 
+           email_verification_expiry = $2,
+           updated_at = NOW()
+       WHERE id = $3`,
+      [verificationToken, verificationExpiry, user.id]
+    );
+
+    // Send verification email
+    const verificationUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/verify-email?token=${verificationToken}`;
+    
+    try {
+      await sendEmail(email, 'welcome', {
+        user,
+        verificationUrl
+      });
+      
+      res.json({
+        success: true,
+        message: 'Email verifikasi telah dikirim ulang. Silakan cek inbox Anda.'
+      });
+    } catch (emailError) {
+      console.error('❌ Failed to resend verification email:', emailError);
+      res.status(500).json({
+        success: false,
+        message: 'Gagal mengirim email verifikasi'
+      });
+    }
+
+  } catch (error) {
+    console.error('Resend verification error:', error);
     res.status(500).json({
       success: false,
       message: 'Terjadi kesalahan server'
@@ -127,7 +295,9 @@ router.post('/login', [
 
     // Find user by email
     const result = await query(
-      'SELECT id, full_name, email, password_hash, role, plan, trial_expiry, subscription_expiry, email_verified, avatar_url FROM users WHERE email = $1',
+      `SELECT id, full_name, email, password_hash, role, plan, trial_expiry, 
+              subscription_expiry, email_verified, avatar_url 
+       FROM users WHERE email = $1`,
       [email]
     );
 
@@ -160,7 +330,8 @@ router.post('/login', [
       message: 'Login berhasil',
       data: {
         user,
-        token
+        token,
+        emailVerified: user.email_verified
       }
     });
 
@@ -220,44 +391,26 @@ router.post('/forgot-password', [
     );
 
     // Create reset URL
-    const resetUrl = `${process.env.APP_URL}/reset-password?token=${resetToken}`;
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:3000'}/reset-password?token=${resetToken}`;
 
-    // Email content
-    const mailOptions = {
-      from: process.env.EMAIL_FROM,
-      to: user.email,
-      subject: 'Reset Password - Oxdel',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <h2 style="color: #7c3aed;">Reset Password Oxdel</h2>
-          <p>Halo ${user.full_name},</p>
-          <p>Kami menerima permintaan untuk reset password akun Oxdel Anda.</p>
-          <p>Klik tombol di bawah untuk reset password:</p>
-          <a href="${resetUrl}" style="display: inline-block; background: linear-gradient(to right, #7c3aed, #ec4899); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; margin: 16px 0;">Reset Password</a>
-          <p>Atau copy link berikut ke browser Anda:</p>
-          <p style="word-break: break-all; color: #6b7280;">${resetUrl}</p>
-          <p><strong>Link ini akan expired dalam 1 jam.</strong></p>
-          <p>Jika Anda tidak meminta reset password, abaikan email ini.</p>
-          <hr style="margin: 24px 0; border: none; border-top: 1px solid #e5e7eb;">
-          <p style="color: #6b7280; font-size: 14px;">Tim Oxdel</p>
-        </div>
-      `
-    };
-
-    // Send email (in development, just log to console)
-    if (process.env.NODE_ENV === 'development') {
-      console.log('=== RESET PASSWORD EMAIL ===');
-      console.log(`To: ${user.email}`);
-      console.log(`Reset URL: ${resetUrl}`);
-      console.log('============================');
-    } else {
-      await transporter.sendMail(mailOptions);
+    // Send reset email
+    try {
+      await sendEmail(user.email, 'resetPassword', {
+        user,
+        resetUrl
+      });
+      
+      res.json({
+        success: true,
+        message: 'Link reset password telah dikirim ke email Anda'
+      });
+    } catch (emailError) {
+      console.error('❌ Failed to send reset email:', emailError);
+      res.status(500).json({
+        success: false,
+        message: 'Gagal mengirim email reset password'
+      });
     }
-
-    res.json({
-      success: true,
-      message: 'Link reset password telah dikirim ke email Anda'
-    });
 
   } catch (error) {
     console.error('Forgot password error:', error);

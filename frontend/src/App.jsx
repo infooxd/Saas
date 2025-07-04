@@ -6,6 +6,7 @@ import LoginPage from './pages/auth/LoginPage.jsx';
 import RegisterPage from './pages/auth/RegisterPage.jsx';
 import ForgotPasswordPage from './pages/auth/ForgotPasswordPage.jsx';
 import ResetPasswordPage from './pages/auth/ResetPasswordPage.jsx';
+import VerifyEmailPage from './pages/auth/VerifyEmailPage.jsx';
 import DashboardPage from './pages/DashboardPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import TemplatesPage from './pages/TemplatesPage.jsx';
@@ -76,6 +77,9 @@ function AppRoutes() {
           <ResetPasswordPage />
         </PublicRoute>
       } />
+      
+      {/* Email Verification - accessible to all */}
+      <Route path="/verify-email" element={<VerifyEmailPage />} />
       
       {/* Public Pages */}
       <Route path="/pricing" element={<PricingPage />} />
